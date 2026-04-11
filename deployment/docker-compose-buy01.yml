@@ -1,0 +1,145 @@
+# Docker Compose Buy-01 Deployment
+# File: deployment/docker-compose-buy01.yml
+#
+# Docker Compose file for the buy-01 microservices platform.
+# This deploys the full application stack.
+
+version: '3.8'
+
+services:
+  # ============================================
+  # API Gateway
+  # ============================================
+  api-gateway:
+    image: nginx:alpine
+    container_name: buy01-api-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - buy01-network
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # User Service
+  # ============================================
+  user-service:
+    image: buy01/user-service:latest
+    container_name: buy01-user-service
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/buy01
+      - JWT_SECRET=your-secret-key
+    networks:
+      - buy01-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ============================================
+  # Product Service
+  # ============================================
+  product-service:
+    image: buy01/product-service:latest
+    container_name: buy01-product-service
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/buy01
+    networks:
+      - buy01-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ============================================
+  # Order Service
+  # ============================================
+  order-service:
+    image: buy01/order-service:latest
+    container_name: buy01-order-service
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/buy01
+    networks:
+      - buy01-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ============================================
+  # MySQL Database
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: buy01-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: buy01
+      MYSQL_USER: buy01user
+      MYSQL_PASSWORD: buy01pass123
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - buy01-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:alpine
+    container_name: buy01-redis
+    restart: unless-stopped
+    networks:
+      - buy01-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # RabbitMQ
+  # ============================================
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    container_name: buy01-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: buy01
+      RABBITMQ_DEFAULT_PASS: rabbitmq123
+    ports:
+      - "15672:15672"
+    networks:
+      - buy01-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  buy01-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
