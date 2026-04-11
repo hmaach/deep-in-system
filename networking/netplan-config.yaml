@@ -1,0 +1,73 @@
+# Netplan Configuration for Static IP
+# File: /etc/netplan/00-installer-config.yaml
+#
+# This configuration sets up a static IP address for the Ubuntu Server.
+# Replace 'ens33' with your actual network interface name.
+#
+# Usage:
+#   1. Edit this file with your desired IP configuration
+#   2. Apply with: sudo netplan apply
+#   3. Verify with: ip addr show
+
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    # Replace 'ens33' with your actual network interface
+    # Common names: ens33, enp0s3, eth0
+    ens33:
+      # Disable DHCP - we want static IP
+      dhcp4: no
+      dhcp6: no
+      
+      # Static IP address with subnet mask
+      # Format: IP_ADDRESS/CIDR
+      # Example: 192.168.1.100/24 means:
+      #   - IP: 192.168.1.100
+      #   - Subnet: 255.255.255.0 (/24)
+      addresses:
+        - 192.168.1.100/24
+      
+      # Default gateway (router IP)
+      # Usually the first IP in your network range
+      gateway4: 192.168.1.1
+      
+      # DNS nameservers
+      nameservers:
+        addresses:
+          # Google DNS
+          - 8.8.8.8
+          - 8.8.4.4
+          # Cloudflare DNS (optional)
+          # - 1.1.1.1
+        # Domain search (optional)
+        search:
+          - local
+
+# Alternative configuration for /25 network:
+# network:
+#   version: 2
+#   renderer: networkd
+#   ethernets:
+#     ens33:
+#       dhcp4: no
+#       addresses:
+#         - 192.168.1.128/25
+#       gateway4: 192.168.1.1
+#       nameservers:
+#         addresses:
+#           - 8.8.8.8
+
+# Alternative configuration for /26 network:
+# network:
+#   version: 2
+#   renderer: networkd
+#   ethernets:
+#     ens33:
+#       dhcp4: no
+#       addresses:
+#         - 192.168.1.192/26
+#       gateway4: 192.168.1.1
+#       nameservers:
+#         addresses:
+#           - 8.8.8.8
