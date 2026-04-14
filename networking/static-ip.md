@@ -1,229 +1,155 @@
-# Static IP Configuration Guide
+# Static IP Configuration
 
 ## Overview
 
-This guide explains how to configure a static IP address on Ubuntu Server for the deep-in-system project.
+This section documents how the static IP was configured on the Ubuntu Server.
 
-## Requirements
+The goal was to:
 
-- Static private IP address (your choice of netmask)
-- Internet connectivity must work
-- No dynamic IP (DHCP) on any internet-facing interface
+- disable DHCP
+- assign a fixed IP
+- ensure internet connectivity
 
-## Why Static IP?
+---
 
-- **Server Reliability**: Servers need predictable IP addresses
-- **DNS**: Easier to set up DNS records
-- **Firewall**: Configure firewall rules consistently
-- **Access**: Always know how to reach the server
+## Network Context
 
-## Network Interface Identification
+Host machine:
+
+```
+
+10.1.18.24/16
+
+```
+
+Chosen static IP for the server:
+
+```
+
+10.1.18.50/16
+
+```
+
+---
+
+## Step 1 — Switch to Bridged Network
+
+In VirtualBox:
+
+```
+
+Settings → Network → Adapter 1
+
+```
+
+Set:
+
+```
+
+Attached to: Bridged Adapter
+Interface: eno2
+Promiscuous Mode: Allow All
+
+```
+
+This connects the VM to the same network as the host.
+
+---
+
+## Step 2 — Identify Interface
+
+Inside the VM:
 
 ```bash
-# List all network interfaces
 ip a
-
-# Show only ethernet interfaces
-ip link show
-
-# Show interface details
-ip addr show
 ```
 
-Common interface names:
-- `ens33`, `enp0s3` (VMware/VirtualBox)
-- `eth0` (older systems)
+Interface used:
 
-## Configuration Methods
-
-### Method 1: Netplan (Ubuntu Server 18.04+)
-
-Netplan is the default network configuration tool for Ubuntu Server.
-
-```bash
-# Check current configuration
-ls -la /etc/netplan/
+```
+enp0s3
 ```
 
-Example netplan configuration file:
+---
+
+## Step 3 — Configure Netplan
+
+Edit:
+
+```
+/etc/netplan/00-installer-config.yaml
+```
+
+Final configuration:
 
 ```yaml
 network:
   version: 2
   renderer: networkd
   ethernets:
-    ens33:
-      dhcp4: no
+    enp0s3:
+      dhcp4: false
       addresses:
-        - 192.168.1.100/24
-      gateway4: 192.168.1.1
+        - 10.1.18.50/16
+      routes:
+        - to: default
+          via: 10.1.0.1
       nameservers:
         addresses:
           - 8.8.8.8
-          - 8.8.4.4
-```
-
-Apply changes:
-
-```bash
-# Apply new configuration
-sudo netplan apply
-
-# Test connectivity
-ping -c 5 google.com
-
-# Check IP address
-ip addr show ens33
-```
-
-### Method 2: Cloud-Init Configuration
-
-On cloud images, network is managed by cloud-init:
-
-```bash
-# Edit cloud-init config
-sudo vim /etc/cloud/cloud.cfg.d/99.cfg
-
-# Or disable cloud-init network
-sudo touch /etc/cloud/cloud-init.disabled
-```
-
-## Understanding IP Configuration
-
-### IP Address Structure
-
-```
-192.168.1.100/24
-|          |
-|          └── Subnet mask (24 bits = 255.255.255.0)
-|
-└─────────── Network address (first 3 octets)
-```
-
-### Common Subnet Masks
-
-| CIDR | Netmask | Usable Hosts |
-|------|---------|--------------|
-| /24  | 255.255.255.0 | 254 |
-| /25  | 255.255.255.128 | 126 |
-| /26  | 255.255.255.192 | 62 |
-| /27  | 255.255.255.224 | 30 |
-| /28  | 255.255.255.240 | 14 |
-
-### Private IP Ranges
-
-- **10.0.0.0/8**: 10.0.0.0 - 10.255.255.255
-- **172.16.0.0/12**: 172.16.0.0 - 172.31.255.255
-- **192.168.0.0/16**: 192.168.0.0 - 192.168.255.255
-
-## Example Configurations
-
-### Static IP with /24 Network
-
-```yaml
-# /etc/netplan/00-installer-config.yaml
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ens33:
-      dhcp4: no
-      addresses:
-        - 192.168.1.100/24
-      gateway4: 192.168.1.1
-      nameservers:
-        addresses:
-          - 8.8.8.8
-          - 8.8.4.4
-```
-
-### Multiple DNS Servers
-
-```yaml
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ens33:
-      dhcp4: no
-      addresses:
-        - 192.168.1.100/24
-      gateway4: 192.168.1.1
-      nameservers:
-        addresses:
-          - 8.8.8.8
-          - 8.8.4.4
           - 1.1.1.1
-        search:
-          - local.domain
 ```
 
-## Verify Internet Connectivity
+---
+
+## Step 4 — Apply Configuration
 
 ```bash
-# Test internet connection
-ping -c 5 google.com
+sudo netplan try
+sudo netplan apply
+```
 
-# Test DNS resolution
-nslookup google.com
+---
 
-# Show routing table
+## Step 5 — Verification
+
+```bash
+ip a
 ip route
-
-# Check DNS
-cat /etc/resolv.conf
+ping 10.1.0.1
+ping 8.8.8.8
+ping google.com
 ```
 
-## Troubleshooting
+Expected results:
 
-### No Internet After Configuration
+- IP is correctly assigned → `10.1.18.50`
+- Default route exists → `via 10.1.0.1`
+- Internet access works
 
-```bash
-# Check if interface is up
-ip link set ens33 up
+---
 
-# Check IP address
-ip addr show ens33
+## Key Points
 
-# Check gateway
-ip route
+- `renderer: networkd` is used for server environments
+- `routes` replaces deprecated `gateway4`
+- IP, netmask, and gateway must belong to the same network
+- Bridged mode is required to use the host network
 
-# Test gateway
-ping -c 5 192.168.1.1
+---
 
-# Test DNS
-ping -c 5 8.8.8.8
-```
+## Troubleshooting (What Was Fixed)
 
-### Netplan Apply Errors
+- Wrong gateway (`192.168.x.x`) → fixed to `10.1.0.1`
+- VM was using NAT → switched to Bridged
+- Renderer typo (`network`) → corrected to `networkd`
 
-```bash
-# Validate configuration
-sudo netplan generate
+---
 
-# Check for syntax errors
-sudo netplan --debug apply
-```
+## Result
 
-### DNS Not Working
+The server now has:
 
-```bash
-# Check resolv.conf
-cat /etc/resolv.conf
-
-# Test specific DNS server
-dig @8.8.8.8 google.com
-
-# Use systemd-resolved
-sudo systemctl restart systemd-resolved
-```
-
-## Network Commands Reference
-
-| Command | Description |
-|---------|-------------|
-| `ip a` | Show all addresses |
-| `ip link set <iface> up/down` | Enable/disable interface |
-| `ip route show` | Display routing table |
-| `ip neigh show` | Show ARP table |
-| `ss -tuln` | Show listening ports |
+- Static IP configured
+- Internet access working
+- Ready for further setup (SSH, firewall, services)
