@@ -2,10 +2,10 @@
 
 **Projects fused:**
 
-* deep-in-system (Linux system administration)
-* buy-01 (microservices platform)
-* Jenkins CI/CD pipeline
-* SonarQube code quality platform
+- deep-in-system (Linux system administration)
+- buy-01 (microservices platform)
+- Jenkins CI/CD pipeline
+- SonarQube code quality platform
 
 Goal: **build a production-like DevOps environment on one Ubuntu server.**
 
@@ -115,7 +115,9 @@ curl \
 wget \
 vim \
 ufw \
-build-essential
+openssh-server \
+build-essential \
+vsftpd
 ```
 
 ---
@@ -498,10 +500,10 @@ http://server-ip:8080
 
 Install plugins:
 
-* Git
-* Docker
-* Pipeline
-* SonarQube Scanner
+- Git
+- Docker
+- Pipeline
+- SonarQube Scanner
 
 ---
 
@@ -657,11 +659,11 @@ Verify:
 
 You finish with a **complete DevOps infrastructure** containing:
 
-* Linux system administration
-* service deployment
-* container orchestration
-* CI/CD automation
-* static code analysis
-* backup management
+- Linux system administration
+- service deployment
+- container orchestration
+- CI/CD automation
+- static code analysis
+- backup management
 
 This resembles a **real small production platform**.
