@@ -2,85 +2,139 @@
 
 ## Overview
 
-This section documents how the static IP was configured on the Ubuntu Server.
+This section documents how to configure a static IP on an Ubuntu Server VM running in VirtualBox.
 
-The goal was to:
+The goal is to:
 
-- disable DHCP
-- assign a fixed IP
-- ensure internet connectivity
+- Disable DHCP
+- Assign a fixed IP to the VM
+- Ensure internet connectivity through the host's network
 
 ---
 
 ## Network Context
 
-Host machine:
+Before configuring, gather these values from your **host machine**:
 
+### 1 — Host IP and Subnet
+
+```bash
+ip route
 ```
 
-10.1.18.24/16
+Look for the line like:
 
 ```
-
-Chosen static IP for the server:
-
+192.168.11.0/24 dev wlp0s20f3 proto kernel scope link src 192.168.11.106
 ```
 
-10.1.18.50/16
+- **Host IP**: the value after `src` → e.g. `192.168.11.106`
+- **Subnet prefix**: the `/24` part of the network → e.g. `/24`
+
+### 2 — Gateway
+
+From the same output, look for:
 
 ```
+default via 192.168.11.1 dev wlp0s20f3
+```
+
+- **Gateway**: the value after `via` → e.g. `192.168.11.1`
+
+### 3 — Choose a Static IP for the VM
+
+Pick any unused IP in the same subnet as the host. Example: if host is `192.168.11.106/24`, choose something like `192.168.11.50`.
+
+Verify it's free before using it:
+
+```bash
+ping -c 2 <CHOSEN_VM_IP>
+# No reply = free to use
+```
+
+### 4 — Host Network Interface
+
+```bash
+ip route
+```
+
+Look for the interface name in the default route line:
+
+```
+default via 192.168.11.1 dev wlp0s20f3
+```
+
+- **Host interface**: `wlp0s20f3` (use this in VirtualBox Bridged Adapter)
 
 ---
 
 ## Step 1 — Switch to Bridged Network
 
-In VirtualBox:
+In VirtualBox (VM must be powered off):
 
 ```
-
 Settings → Network → Adapter 1
-
 ```
 
 Set:
 
 ```
-
 Attached to: Bridged Adapter
-Interface: eno2
+Interface: <HOST_INTERFACE>       ← from Step 4 above (e.g. wlp0s20f3)
 Promiscuous Mode: Allow All
-
 ```
 
-This connects the VM to the same network as the host.
+This connects the VM directly to the same network as the host.
 
 ---
 
-## Step 2 — Identify Interface
+## Step 2 — Identify VM Network Interface
 
-Inside the VM:
+Boot the VM and run:
 
 ```bash
 ip a
 ```
 
-Interface used:
+Look for an interface that is **not** `lo` (loopback). It is usually named:
 
 ```
-enp0s3
+enp0s3    ← typical VirtualBox interface name
 ```
+
+Use this name in the Netplan config below.
 
 ---
 
 ## Step 3 — Configure Netplan
 
-Edit:
+Edit the config file:
 
-```
-/etc/netplan/00-installer-config.yaml
+```bash
+sudo nano /etc/netplan/00-installer-config.yaml
 ```
 
-Final configuration:
+Fill in your values:
+
+```yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    <VM_INTERFACE>: # from Step 2 — e.g. enp0s3
+      dhcp4: false
+      addresses:
+        - <CHOSEN_VM_IP>/<PREFIX> # e.g. 192.168.11.50/24
+      routes:
+        - to: default
+          via: <GATEWAY> # from Step 1 — e.g. 192.168.11.1
+      nameservers:
+        addresses:
+          - 8.8.8.8
+          - 1.1.1.1
+```
+
+### Filled Example
 
 ```yaml
 network:
@@ -90,10 +144,10 @@ network:
     enp0s3:
       dhcp4: false
       addresses:
-        - 10.1.18.50/16
+        - 192.168.11.50/24
       routes:
         - to: default
-          via: 10.1.0.1
+          via: 192.168.11.1
       nameservers:
         addresses:
           - 8.8.8.8
@@ -105,8 +159,8 @@ network:
 ## Step 4 — Apply Configuration
 
 ```bash
-sudo netplan try
-sudo netplan apply
+sudo netplan try     # tests config for 120s, auto-reverts if broken
+sudo netplan apply   # applies permanently
 ```
 
 ---
@@ -114,42 +168,43 @@ sudo netplan apply
 ## Step 5 — Verification
 
 ```bash
-ip a
-ip route
-ping 10.1.0.1
-ping 8.8.8.8
-ping google.com
+ip a                         # confirm <CHOSEN_VM_IP> appears on <VM_INTERFACE>
+ip route                     # confirm default route via <GATEWAY>
+ping <GATEWAY>               # confirm local network connectivity
+ping 8.8.8.8                 # confirm internet (IP level)
+ping google.com              # confirm DNS resolution
 ```
 
-Expected results:
+---
 
-- IP is correctly assigned → `10.1.18.50`
-- Default route exists → `via 10.1.0.1`
-- Internet access works
+## Summary Table
+
+| Value          | How to get it                             | Example          |
+| -------------- | ----------------------------------------- | ---------------- |
+| Host IP        | `ip route` → `src` field                  | `192.168.11.106` |
+| Subnet prefix  | `ip route` → prefix after network IP      | `/24`            |
+| Gateway        | `ip route` → `default via` field          | `192.168.11.1`   |
+| Host interface | `ip route` → `dev` field on default route | `wlp0s20f3`      |
+| Chosen VM IP   | Any free IP in same subnet                | `192.168.11.50`  |
+| VM interface   | `ip a` inside the VM                      | `enp0s3`         |
 
 ---
 
 ## Key Points
 
-- `renderer: networkd` is used for server environments
-- `routes` replaces deprecated `gateway4`
-- IP, netmask, and gateway must belong to the same network
-- Bridged mode is required to use the host network
+- `renderer: networkd` is correct for server environments (no desktop)
+- `routes` with `to: default` replaces the deprecated `gateway4` key
+- The VM IP, subnet, and gateway must all belong to the same network
+- Bridged Adapter mode is required — NAT will not put the VM on your local network
 
 ---
 
-## Troubleshooting (What Was Fixed)
+## Common Mistakes
 
-- Wrong gateway (`192.168.x.x`) → fixed to `10.1.0.1`
-- VM was using NAT → switched to Bridged
-- Renderer typo (`network`) → corrected to `networkd`
-
----
-
-## Result
-
-The server now has:
-
-- Static IP configured
-- Internet access working
-- Ready for further setup (SSH, firewall, services)
+| Mistake                         | Fix                                                          |
+| ------------------------------- | ------------------------------------------------------------ |
+| Using NAT instead of Bridged    | Change Adapter 1 to Bridged in VM settings                   |
+| Gateway from a different subnet | Gateway must match the host's `default via` value            |
+| Chosen IP already in use        | Run `ping <IP>` on host first to confirm it's free           |
+| Wrong renderer spelling         | Must be `networkd`, not `network`                            |
+| Editing while VM is running     | Power off the VM before changing VirtualBox network settings |
