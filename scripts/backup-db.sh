@@ -1,45 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -eu
 
-# ============================================
-# Backup Database Script
-# File: scripts/backup-db.sh
-#
-# This script backs up the WordPress database
-# to the /backup directory.
-# ============================================
+DB_NAME="${DB_NAME:-wordpress}"
+DB_USER="${DB_USER:-wpuser}"
+DB_PASS_FILE="${DB_PASS_FILE:-/etc/wordpress-db-password}"
+BACKUP_DIR="${BACKUP_DIR:-/backup}"
+LOG_FILE="${LOG_FILE:-/var/log/backup.log}"
 
-# Configuration
-DB_NAME="wordpress"
-DB_USER="wpuser"
-DB_PASS="StrongPassword123!"  # Update this
-BACKUP_DIR="/backup"
-LOG_FILE="/var/log/backup.log"
-
-# Create backup directory if it doesn't exist
-mkdir -p "$BACKUP_DIR"
-
-# Get date for filename
-DATE=$(date +%Y-%m-%d)
-TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
-
-# Backup filename
-BACKUP_FILE="$BACKUP_DIR/wordpress-${DATE}.sql.gz"
-
-echo "Starting backup at $TIMESTAMP..."
-
-# Create backup
-mysqldump -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" | gzip > "$BACKUP_FILE"
-
-if [ $? -eq 0 ]; then
-    echo "[$TIMESTAMP] WordPress backup created: wordpress-${DATE}.sql.gz" >> "$LOG_FILE"
-    echo "Backup completed: $BACKUP_FILE"
-else
-    echo "[$TIMESTAMP] ERROR: Backup failed!" >> "$LOG_FILE"
-    echo "Backup failed!"
+if [ ! -r "$DB_PASS_FILE" ]; then
+    echo "Missing readable database password file: $DB_PASS_FILE" >&2
     exit 1
 fi
 
-# Cleanup old backups (keep 7 days)
-find "$BACKUP_DIR" -name "wordpress-*.sql.gz" -mtime +7 -delete
+DB_PASS="$(cat "$DB_PASS_FILE")"
+DATE="$(date +%Y-%m-%d)"
+TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+BACKUP_FILE="$BACKUP_DIR/wordpress-$DATE.sql.gz"
 
-echo "Backup process completed."
+mkdir -p "$BACKUP_DIR"
+
+if mysqldump --single-transaction -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" | gzip > "$BACKUP_FILE"; then
+    chmod 644 "$BACKUP_FILE"
+    echo "wordpress backup created!, date: $TIMESTAMP, file: $BACKUP_FILE" >> "$LOG_FILE"
+else
+    rm -f "$BACKUP_FILE"
+    echo "wordpress backup failed!, date: $TIMESTAMP" >> "$LOG_FILE"
+    exit 1
+fi
