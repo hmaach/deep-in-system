@@ -1,0 +1,21 @@
+# http only redirects to https
+<VirtualHost *:80>
+    Redirect permanent / https://{{ static_ip }}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    DocumentRoot /var/www/html
+
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/deep-in-system.crt
+    SSLCertificateKeyFile /etc/ssl/private/deep-in-system.key
+
+    <Directory /var/www/html>
+        AllowOverride All
+    </Directory>
+
+    # wp-config.php has the database password, nobody can open it
+    <Files wp-config.php>
+        Require all denied
+    </Files>
+</VirtualHost>
