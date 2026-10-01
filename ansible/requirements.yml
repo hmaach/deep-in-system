@@ -1,0 +1,5 @@
+---
+collections:
+  - name: community.general  # ufw, apache2_module
+  - name: ansible.mysql      # mysql users and databases
+  - name: ansible.posix      # authorized_key
