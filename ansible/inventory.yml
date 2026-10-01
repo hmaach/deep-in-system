@@ -1,0 +1,6 @@
+---
+all:
+  hosts:
+    server:
+      ansible_host: 10.1.18.50   # the ip of the vm
+      ansible_user: hmaach       # my login

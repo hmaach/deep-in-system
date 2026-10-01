@@ -1,0 +1,5 @@
+---
+vault_zoro_password: change-me
+vault_nami_password: change-me
+vault_db_password: change-me
+vault_wp_password: change-me
