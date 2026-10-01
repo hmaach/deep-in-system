@@ -1,0 +1,12 @@
+# my ssh settings, this file is read before the defaults so it wins
+Port {{ ssh_port }}
+PermitRootLogin no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+
+# nami is only for ftp
+DenyUsers nami
+
+# luffy can only use his key
+Match User luffy
+    PasswordAuthentication no
