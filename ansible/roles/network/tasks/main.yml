@@ -1,0 +1,34 @@
+---
+- name: Write the static ip config
+  template:
+    src: static-ip.yaml.j2
+    dest: /etc/netplan/01-static-ip.yaml
+    mode: "0600"
+  register: static_ip_file
+
+# netplan only reads .yaml files, so renaming to .bak disables them and keeps a backup
+- name: Disable the default dhcp configs
+  command: mv /etc/netplan/{{ item }} /etc/netplan/{{ item }}.bak
+  args:
+    removes: /etc/netplan/{{ item }}
+  loop: [50-cloud-init.yaml, 00-installer-config.yaml]
+  register: old_configs
+
+- name: Stop cloud-init from bringing dhcp back
+  copy:
+    dest: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: "network: {config: disabled}\n"
+    mode: "0644"
+
+# async + poll 0: start it and don't wait, the connection may drop for a second
+- name: Apply the network config
+  command: netplan apply
+  async: 30
+  poll: 0
+  when: static_ip_file.changed or old_configs.changed
+
+- name: Wait for the server to come back
+  wait_for_connection:
+    delay: 5
+    timeout: 60
+  when: static_ip_file.changed or old_configs.changed
