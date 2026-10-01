@@ -1,0 +1,33 @@
+---
+- name: Install vsftpd
+  apt:
+    name: vsftpd
+
+# vsftpd refuses users whose shell is not listed in /etc/shells
+- name: Allow the nologin shell for ftp users
+  lineinfile:
+    path: /etc/shells
+    line: /usr/sbin/nologin
+
+- name: Create nami, her home is /backup and she has no shell
+  user:
+    name: nami
+    home: /backup
+    create_home: false
+    shell: /usr/sbin/nologin
+    password: "{{ nami_password | password_hash('sha512', 'namisalt') }}"
+
+- name: Only nami can use ftp
+  copy:
+    dest: /etc/vsftpd.userlist
+    content: "nami\n"
+    mode: "0644"
+  notify: restart vsftpd
+
+- name: Write the vsftpd config
+  template:
+    src: vsftpd.conf.j2
+    dest: /etc/vsftpd.conf
+    mode: "0644"
+    backup: true
+  notify: restart vsftpd
