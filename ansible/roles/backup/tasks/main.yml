@@ -1,0 +1,13 @@
+---
+- name: Add the backup script
+  template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/backup.sh
+    mode: "0700"
+
+- name: Run the backup every day at 00:00
+  cron:
+    name: wordpress backup
+    minute: "0"
+    hour: "0"
+    job: /usr/local/bin/backup.sh
