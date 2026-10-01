@@ -1,0 +1,40 @@
+---
+- name: Install mysql
+  apt:
+    name: mysql-server
+
+# only programs on the server can reach mysql
+- name: Listen on localhost only
+  lineinfile:
+    path: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: '^bind-address'
+    line: bind-address = 127.0.0.1
+    backup: true
+  notify: restart mysql
+
+- name: Start mysql
+  systemd:
+    name: mysql
+    state: started
+    enabled: true
+
+# on ubuntu, root logs in to mysql through the socket, no password needed
+- name: Remove root accounts that work from other hosts
+  ansible.mysql.mysql_query:
+    login_unix_socket: /run/mysqld/mysqld.sock
+    query:
+      - DELETE FROM mysql.user WHERE User = 'root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')
+      - FLUSH PRIVILEGES
+
+- name: Create the wordpress database
+  ansible.mysql.mysql_db:
+    login_unix_socket: /run/mysqld/mysqld.sock
+    name: "{{ db_name }}"
+
+- name: Create the wordpress user, only for the wordpress database
+  ansible.mysql.mysql_user:
+    login_unix_socket: /run/mysqld/mysqld.sock
+    name: "{{ db_user }}"
+    host: localhost
+    password: "{{ db_password }}"
+    priv: "{{ db_name }}.*:ALL"
