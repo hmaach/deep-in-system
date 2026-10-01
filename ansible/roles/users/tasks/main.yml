@@ -1,0 +1,32 @@
+---
+# luffy: sudoer, can only log in with his ssh key
+- name: Create luffy
+  user:
+    name: luffy
+    home: /home/luffy
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    password: "!"   # locked password, so only the key works
+
+- name: Add my public key to luffy
+  ansible.posix.authorized_key:
+    user: luffy
+    key: "{{ lookup('file', luffy_public_key) }}"
+
+# luffy has no password, so sudo must not ask for one
+- name: Let luffy use sudo without a password
+  copy:
+    dest: /etc/sudoers.d/luffy
+    content: "luffy ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: visudo -cf %s
+
+# zoro: password login, not a sudoer
+- name: Create zoro
+  user:
+    name: zoro
+    home: /home/zoro
+    shell: /bin/bash
+    groups: ""
+    password: "{{ zoro_password | password_hash('sha512', 'zorosalt') }}"
