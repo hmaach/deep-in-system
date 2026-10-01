@@ -1,0 +1,23 @@
+---
+- name: Block all incoming traffic by default
+  community.general.ufw:
+    default: deny
+    direction: incoming
+
+- name: Open only the ports I use
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ open_ports }}"
+
+- name: Close port 22 (ssh is on 2222 now)
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    delete: true
+
+- name: Turn on the firewall
+  community.general.ufw:
+    state: enabled

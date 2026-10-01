@@ -1,0 +1,30 @@
+listen=YES
+
+# no anonymous login, local users only
+anonymous_enable=NO
+local_enable=YES
+
+# read only
+write_enable=NO
+
+# users are locked in their home, nami's home is /backup
+chroot_local_user=YES
+secure_chroot_dir=/var/run/vsftpd/empty
+pam_service_name=vsftpd
+
+# only the users in this file can log in (just nami)
+userlist_enable=YES
+userlist_deny=NO
+userlist_file=/etc/vsftpd.userlist
+
+# passive mode, same ports as the firewall
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40100
+
+# ssl is available but not forced, so the normal ftp command still works
+ssl_enable=YES
+rsa_cert_file=/etc/ssl/certs/deep-in-system.crt
+rsa_private_key_file=/etc/ssl/private/deep-in-system.key
+force_local_logins_ssl=NO
+force_local_data_ssl=NO

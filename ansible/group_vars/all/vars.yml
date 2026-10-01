@@ -1,0 +1,33 @@
+---
+login: hmaach
+
+# network
+static_ip: "{{ ansible_host }}"     # keep the ip the vm has now
+netmask: 16                        # 255.255.0.0
+gateway: "{{ ansible_default_ipv4.gateway }}"   # same gateway the vm uses now
+dns: [8.8.8.8, 1.1.1.1]
+
+# ssh
+ssh_port: 2222
+luffy_public_key: ~/.ssh/luffy.pub
+
+# firewall: every open port and why
+open_ports:
+  - "2222"          # ssh
+  - "80"            # wordpress (redirects to https)
+  - "443"           # wordpress https
+  - "21"            # ftp
+  - "40000:40100"   # ftp passive mode
+  - "25565"         # minecraft
+
+# wordpress
+db_name: wordpress
+db_user: wp_user
+wp_admin: "{{ login }}"
+wp_email: "{{ login }}@example.com"
+
+# passwords come from vault.yml
+zoro_password: "{{ vault_zoro_password }}"
+nami_password: "{{ vault_nami_password }}"
+db_password: "{{ vault_db_password }}"
+wp_password: "{{ vault_wp_password }}"

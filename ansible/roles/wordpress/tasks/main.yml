@@ -1,0 +1,71 @@
+---
+- name: Install apache and php
+  apt:
+    name: [apache2, php, libapache2-mod-php, php-mysql, php-curl, php-gd, php-mbstring, php-xml, php-zip]
+
+- name: Enable the apache modules
+  community.general.apache2_module:
+    name: "{{ item }}"
+  loop: [rewrite, ssl]
+  notify: restart apache
+
+- name: Add my wordpress site
+  template:
+    src: wordpress.conf.j2
+    dest: /etc/apache2/sites-available/wordpress.conf
+    mode: "0644"
+  notify: restart apache
+
+- name: Disable the default site
+  command: a2dissite 000-default
+  args:
+    removes: /etc/apache2/sites-enabled/000-default.conf
+  notify: restart apache
+
+- name: Enable my site
+  command: a2ensite wordpress
+  args:
+    creates: /etc/apache2/sites-enabled/wordpress.conf
+  notify: restart apache
+
+- name: Remove the apache test page
+  file:
+    path: /var/www/html/index.html
+    state: absent
+
+# wp-cli installs wordpress from the terminal, no browser setup needed
+- name: Install wp-cli
+  get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /usr/local/bin/wp
+    mode: "0755"
+
+- name: Download wordpress
+  command: wp core download --path=/var/www/html --allow-root
+  args:
+    creates: /var/www/html/wp-settings.php
+
+- name: Create wp-config.php
+  command: >
+    wp config create --path=/var/www/html --allow-root
+    --dbname={{ db_name }} --dbuser={{ db_user }} --dbpass={{ db_password | quote }}
+  args:
+    creates: /var/www/html/wp-config.php
+  no_log: true
+
+- name: Install wordpress and create the admin
+  command: >
+    wp core install --path=/var/www/html --allow-root
+    --url=https://{{ static_ip }} --title=deep-in-system
+    --admin_user={{ wp_admin }} --admin_password={{ wp_password | quote }}
+    --admin_email={{ wp_email }} --skip-email
+  register: wp_install
+  changed_when: "'installed successfully' in wp_install.stdout"
+  no_log: true
+
+- name: Give the site files to apache
+  file:
+    path: /var/www/html
+    owner: www-data
+    group: www-data
+    recurse: true

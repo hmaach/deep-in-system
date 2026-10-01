@@ -1,0 +1,35 @@
+---
+# On a fresh vm ssh is on port 22, after the ssh role it is on 2222.
+# This first play checks which one is open, so I can run the playbook again anytime.
+- name: Find the ssh port
+  hosts: server
+  gather_facts: false
+  tasks:
+    - name: Check if port 2222 is open
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ ssh_port }}"
+        timeout: 3
+      delegate_to: localhost
+      register: port_check
+      ignore_errors: true
+
+    - name: Use 2222 if it is open, otherwise 22
+      set_fact:
+        ansible_port: "{{ ssh_port if port_check is succeeded else 22 }}"
+
+- name: Setup the server
+  hosts: server
+  become: true
+  roles:
+    - { role: common, tags: common }
+    - { role: users, tags: users }
+    - { role: ssh, tags: ssh }
+    - { role: firewall, tags: firewall }
+    - { role: mysql, tags: mysql }
+    - { role: ssl, tags: ssl }
+    - { role: wordpress, tags: wordpress }
+    - { role: ftp, tags: ftp }
+    - { role: backup, tags: backup }
+    - { role: minecraft, tags: minecraft }
+    - { role: network, tags: network }  # last, changing the ip can cut the connection

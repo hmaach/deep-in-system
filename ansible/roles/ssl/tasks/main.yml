@@ -1,0 +1,10 @@
+---
+# one self-signed certificate, used by apache and vsftpd
+- name: Create a self-signed certificate
+  command: >
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365
+    -keyout /etc/ssl/private/deep-in-system.key
+    -out /etc/ssl/certs/deep-in-system.crt
+    -subj "/CN={{ login }}-host"
+  args:
+    creates: /etc/ssl/certs/deep-in-system.crt

@@ -1,0 +1,84 @@
+---
+# checks the audit points one by one: ansible-playbook verify.yml
+# every task is one audit question, a red line means that point is wrong.
+- name: Check the server
+  hosts: server
+  become: true
+  gather_facts: false
+  ignore_errors: true
+  vars:
+    ansible_port: "{{ ssh_port }}"
+  tasks:
+    - name: Hostname is {login}-host
+      command: hostname
+      register: out
+      changed_when: false
+      failed_when: out.stdout != login ~ '-host'
+
+    - name: My user is in the sudo group
+      command: id -nG {{ login }}
+      register: out
+      changed_when: false
+      failed_when: "'sudo' not in out.stdout.split()"
+
+    - name: No dynamic ip
+      shell: ip a | grep dynamic
+      register: out
+      changed_when: false
+      failed_when: out.rc == 0
+
+    - name: Internet works
+      command: ping -c 2 google.com
+      changed_when: false
+
+    - name: Ssh is on port 2222 and root login is off
+      shell: sshd -T | grep -E '^(port|permitrootlogin) '
+      register: out
+      changed_when: false
+      failed_when: "'port 2222' not in out.stdout or 'permitrootlogin no' not in out.stdout"
+
+    - name: Firewall is active and mysql port is closed
+      command: ufw status
+      register: out
+      changed_when: false
+      failed_when: "'Status: active' not in out.stdout or '3306' in out.stdout"
+
+    - name: Luffy is a sudoer
+      command: groups luffy
+      register: out
+      changed_when: false
+      failed_when: "out.stdout != 'luffy : luffy sudo'"
+
+    - name: Zoro is not a sudoer
+      command: groups zoro
+      register: out
+      changed_when: false
+      failed_when: "out.stdout != 'zoro : zoro'"
+
+    - name: Mysql only listens on localhost
+      shell: ss -tln | grep ':3306 '
+      register: out
+      changed_when: false
+      failed_when: "'127.0.0.1:3306' not in out.stdout"
+
+    - name: Wordpress answers
+      command: curl -sk -o /dev/null -w '%{http_code}' https://localhost/
+      register: out
+      changed_when: false
+      failed_when: out.stdout != '200'
+
+    - name: Wp-config.php is blocked
+      command: curl -sk -o /dev/null -w '%{http_code}' https://localhost/wp-config.php
+      register: out
+      changed_when: false
+      failed_when: out.stdout != '403'
+
+    - name: Backup cron runs at 00:00
+      shell: crontab -l | grep backup.sh
+      register: out
+      changed_when: false
+      failed_when: "not out.stdout.startswith('0 0 * * *')"
+
+    - name: All services are running
+      command: systemctl is-active ssh ufw mysql apache2 vsftpd cron minecraft
+      changed_when: false

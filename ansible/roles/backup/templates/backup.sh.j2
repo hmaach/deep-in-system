@@ -1,0 +1,16 @@
+#!/bin/bash
+# saves the wordpress database in /backup, cron runs it every day at 00:00
+set -e
+
+name="wordpress-$(date +%Y-%m-%d_%H-%M-%S)"
+
+cd /tmp
+mysqldump {{ db_name }} > "$name.sql"
+tar -czf "/backup/$name.tar.gz" "$name.sql"
+rm "$name.sql"
+
+# nami can read it over ftp, other users can't
+chown root:nami "/backup/$name.tar.gz"
+chmod 640 "/backup/$name.tar.gz"
+
+echo "wordpress backup created!, date: $(date '+%Y-%m-%d %H:%M:%S')" >> /var/log/backup.log

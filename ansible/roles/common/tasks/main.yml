@@ -1,0 +1,39 @@
+---
+- name: Install the packages I need
+  apt:
+    name: [cron, ufw, python3-pymysql]
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set the hostname to {login}-host
+  hostname:
+    name: "{{ login }}-host"
+
+- name: Add the hostname to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ login }}-host"
+    backup: true
+
+- name: Stop cloud-init from changing the hostname back
+  copy:
+    dest: /etc/cloud/cloud.cfg.d/99-hostname.cfg
+    content: "preserve_hostname: true\n"
+    mode: "0644"
+
+- name: Make sure my user is in the sudo group
+  user:
+    name: "{{ login }}"
+    groups: sudo
+    append: true
+
+# the audit wants a vm without aliases that change command output
+- name: Remove all aliases
+  lineinfile:
+    path: "{{ item }}"
+    line: unalias -a
+  loop:
+    - /home/{{ login }}/.bashrc
+    - /etc/skel/.bashrc
+    - /root/.bashrc
