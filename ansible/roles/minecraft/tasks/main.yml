@@ -1,0 +1,51 @@
+---
+- name: Install java
+  apt:
+    name: openjdk-21-jre-headless
+
+- name: Create the minecraft user
+  user:
+    name: minecraft
+    system: true
+    home: /opt/minecraft
+    shell: /usr/sbin/nologin
+
+# mojang publishes a json file with the link to the latest server jar
+- name: Get the list of minecraft versions
+  uri:
+    url: https://piston-meta.mojang.com/mc/game/version_manifest_v2.json
+  register: versions
+
+- name: Get the details of the latest version
+  uri:
+    url: "{{ (versions.json.versions | selectattr('id', 'equalto', versions.json.latest.release) | first).url }}"
+  register: latest
+
+- name: Download the server
+  get_url:
+    url: "{{ latest.json.downloads.server.url }}"
+    dest: /opt/minecraft/server.jar
+    owner: minecraft
+    mode: "0644"
+
+- name: Accept the eula
+  copy:
+    dest: /opt/minecraft/eula.txt
+    content: "eula=true\n"
+    owner: minecraft
+    mode: "0644"
+
+- name: Add the minecraft service
+  template:
+    src: minecraft.service.j2
+    dest: /etc/systemd/system/minecraft.service
+    mode: "0644"
+  notify: restart minecraft
+
+# enabled = starts again after a reboot
+- name: Start minecraft and enable it at boot
+  systemd:
+    name: minecraft
+    state: started
+    enabled: true
+    daemon_reload: true

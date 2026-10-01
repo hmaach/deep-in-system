@@ -1,0 +1,13 @@
+network:
+  version: 2
+  ethernets:
+    {{ ansible_default_ipv4.interface }}:
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses: [{{ static_ip }}/{{ netmask }}]
+      routes:
+        - to: default
+          via: {{ gateway }}
+      nameservers:
+        addresses: [{{ dns | join(', ') }}]
