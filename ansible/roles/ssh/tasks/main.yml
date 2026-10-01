@@ -1,0 +1,32 @@
+---
+- name: Write my ssh config
+  template:
+    src: ssh.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-deep-in-system.conf
+    mode: "0644"
+    validate: sshd -t -f %s
+  notify: restart ssh
+
+# newer ubuntu starts ssh with ssh.socket, which keeps listening on 22.
+# running ssh.service directly makes it use the port from my config.
+- name: Disable ssh.socket
+  systemd:
+    name: ssh.socket
+    enabled: false
+    state: stopped
+  failed_when: false   # older ubuntu does not have it
+
+- name: Enable ssh.service
+  systemd:
+    name: ssh
+    enabled: true
+
+- name: Restart ssh now
+  meta: flush_handlers
+
+- name: Continue on the new port
+  set_fact:
+    ansible_port: "{{ ssh_port }}"
+
+- name: Reconnect
+  meta: reset_connection
